@@ -69,6 +69,7 @@ natsSock_SetCommonTcpOptions(natsSock fd)
     return NATS_OK;
 }
 
+#if NATS_ASYNC_IO == NATS_ASYNC_IO_SELECT
 natsStatus
 natsSock_CreateFDSet(fd_set **newFDSet)
 {
@@ -99,6 +100,7 @@ natsSock_DestroyFDSet(fd_set *fdSet)
 
     NATS_FREE(fdSet);
 }
+#endif
 
 #define MAX_HOST_NAME   (256)
 

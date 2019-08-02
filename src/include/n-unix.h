@@ -14,6 +14,8 @@
 #ifndef N_UNIX_H_
 #define N_UNIX_H_
 
+#include "n-common.h"
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -22,12 +24,12 @@
 #include <stdbool.h>
 
 #ifdef DARWIN
-#define FD_SETSIZE  (32768)
+#define NATS_ASYNC_IO  NATS_ASYNC_IO_SELECT
+#define FD_SETSIZE     (32768)
 #else
+#define NATS_ASYNC_IO  NATS_ASYNC_IO_EPOLL
 #include <sys/types.h>
-#undef __FD_SETSIZE
-#define __FD_SETSIZE (32768)
-#include <sys/select.h>
+#include <sys/epoll.h>
 #endif
 
 #include <sys/time.h>

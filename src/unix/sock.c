@@ -29,16 +29,29 @@ natsSock_Init(natsSockCtx *ctx)
 
     ctx->fd = NATS_SOCK_INVALID;
 
-
+#if NATS_ASYNC_IO == NATS_ASYNC_IO_SELECT
     return natsSock_CreateFDSet(&ctx->fdSet);
+#elif NATS_ASYNC_IO == NATS_ASYNC_IO_EPOLL
+    ctx->epFD = epoll_create1(0);
+    if (ctx->epFD < 0)
+        return nats_setError(NATS_IO_ERROR, "epoll_create1 error: %d", ctx->epFD);
+#else
+#error invalid NATS_ASYNC_IO
+#endif
+    return NATS_OK;
 }
 
 void
 natsSock_Clear(natsSockCtx *ctx)
 {
+#if NATS_ASYNC_IO == NATS_ASYNC_IO_SELECT
     natsSock_DestroyFDSet(ctx->fdSet);
+#elif NATS_ASYNC_IO == NATS_ASYNC_IO_EPOLL
+    close(ctx->epFD);
+#endif
 }
 
+#if NATS_ASYNC_IO == NATS_ASYNC_IO_SELECT
 natsStatus
 natsSock_WaitReady(int waitMode, natsSockCtx *ctx)
 {
@@ -70,6 +83,48 @@ natsSock_WaitReady(int waitMode, natsSockCtx *ctx)
 
     return NATS_OK;
 }
+#elif NATS_ASYNC_IO == NATS_ASYNC_IO_EPOLL
+natsStatus
+natsSock_WaitReady(int waitMode, natsSockCtx *ctx)
+{
+    struct timeval     *timeout = NULL;
+    int                timeoutMS = -1;
+    int                nfds, i;
+    struct epoll_event ev, ev_ret[1];
+    natsSock           sock = ctx->fd;
+    natsDeadline       *deadline = &(ctx->deadline);
+
+    memset(&ev, 0, sizeof(ev));
+    switch (waitMode)
+    {
+        case WAIT_FOR_READ:     ev.events = EPOLLIN; break;
+        case WAIT_FOR_WRITE:    ev.events = EPOLLOUT; break;
+        case WAIT_FOR_CONNECT:  ev.events = EPOLLOUT; break;
+        default: abort();
+    }
+    ev.data.fd = sock;
+    if (epoll_ctl(ctx->epFD, EPOLL_CTL_ADD, sock, &ev) != 0)
+        return nats_setError(NATS_IO_ERROR, "epoll_ctl(ADD) error: %d", errno);
+
+    if (deadline != NULL)
+        timeout = natsDeadline_GetTimeout(deadline);
+    if (timeout != NULL)
+        timeoutMS = timeout->tv_sec * 1000 + timeout->tv_usec * 0.001;
+
+    nfds = epoll_wait(ctx->epFD, ev_ret, 1, timeoutMS);
+
+    if (epoll_ctl(ctx->epFD, EPOLL_CTL_DEL, sock, &ev) != 0)
+        return nats_setError(NATS_IO_ERROR, "epoll_ctl(DEL) error: %d", errno);
+
+    if (nfds == -1)
+        return nats_setError(NATS_IO_ERROR, "epoll_wait error: %d", nfds);
+
+    if (nfds != 1 || ev_ret[0].data.fd != sock)
+        return nats_setDefaultError(NATS_TIMEOUT);
+
+    return NATS_OK;
+}
+#endif
 
 natsStatus
 natsSock_SetBlocking(natsSock fd, bool blocking)

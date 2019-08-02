@@ -14,6 +14,8 @@
 #ifndef N_WIN_H_
 #define N_WIN_H_
 
+#include "n-common.h"
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
@@ -43,6 +45,8 @@ typedef int                 natsRecvLen;
 
 #define NATS_ONCE_TYPE          INIT_ONCE
 #define NATS_ONCE_STATIC_INIT   INIT_ONCE_STATIC_INIT
+
+#define NATS_ASYNC_IO  NATS_ASYNC_IO_SELECT
 
 #define NATS_SOCK_INVALID               (INVALID_SOCKET)
 #define NATS_SOCK_CLOSE(s)              closesocket((s))

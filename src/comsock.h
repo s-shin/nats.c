@@ -31,11 +31,13 @@ natsSock_ConnectTcp(natsSockCtx *ctx, const char *host, int port);
 natsStatus
 natsSock_SetBlocking(natsSock fd, bool blocking);
 
+#if NATS_ASYNC_IO == NATS_ASYNC_IO_SELECT
 natsStatus
 natsSock_CreateFDSet(fd_set **newFDSet);
 
 void
 natsSock_DestroyFDSet(fd_set *fdSet);
+#endif
 
 bool
 natsSock_IsConnected(natsSock fd);
